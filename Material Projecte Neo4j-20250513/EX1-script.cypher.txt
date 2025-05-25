@@ -1,0 +1,62 @@
+// Creació de restriccions i índexs (Neo4j 5.x+)
+CREATE CONSTRAINT municipi_id_unique IF NOT EXISTS
+FOR (m:Municipi) REQUIRE m.id IS UNIQUE;
+
+
+CREATE CONSTRAINT llar_id_unique IF NOT EXISTS
+FOR (l:Llar) REQUIRE l.id IS UNIQUE;
+
+
+CREATE CONSTRAINT individu_id_unique IF NOT EXISTS
+FOR (i:Individu) REQUIRE i.id IS UNIQUE;
+
+
+// Carregar dades de Municipis
+LOAD CSV WITH HEADERS FROM 'file:///dades/HABITATGES.csv' AS row
+WITH row
+WHERE row.Id_Llar <> "null" AND row.Id_Llar <> ""
+  AND row.Municipi <> "null" AND row.Municipi <> ""
+  AND row.Any_Padro <> "null" AND row.Any_Padro <> ""
+  AND row.Numero <> "null" AND row.Numero <> ""
+MERGE (m:Municipi {id: row.Municipi})
+MERGE (l:Llar {id: toInteger(row.Id_Llar)})
+SET l.carrer = row.Carrer,
+    l.numero = row.Numero
+MERGE (p:Padro {id: row.Municipi + "_" + row.Any_Padro + "_" + row.Id_Llar})
+SET p.any = toInteger(row.Any_Padro)
+MERGE (p)-[:PERTANY_A]->(m)
+MERGE (p)-[:CONTE]->(l);
+
+
+// Carregar dades de Llars
+LOAD CSV WITH HEADERS FROM 'file:///FAMILIA.csv' AS row
+WITH row
+WHERE row.IdLlar IS NOT NULL
+MERGE (l:Llar {id: toInteger(row.IdLlar)})
+SET l.tipus = row.TipusLlar;
+// Carregar dades d'Individus
+LOAD CSV WITH HEADERS FROM 'file:///dades/INDIVIDUAL.csv' AS row
+WITH row WHERE row.Id IS NOT NULL
+MERGE (i:Individu {id: toInteger(row.Id)})
+SET i.nom = row.name,
+    i.cognom = row.surname,
+    i.segonCognom = row.second_surname,
+    i.any = toInteger(row.Year);
+
+
+// Crear relacions "VIU" entre Individus i Llars
+LOAD CSV WITH HEADERS FROM 'file:///dades/VIU.csv' AS row
+WITH row 
+WHERE row.IND IS NOT NULL AND row.HOUSE_ID IS NOT NULL
+MATCH (i:Individu {id: toInteger(row.IND)})
+MATCH (l:Llar {id: toInteger(row.HOUSE_ID)})
+MERGE (i)-[:VIU]->(l);
+
+
+// Crear relacions "SAME_AS" entre Individus
+LOAD CSV WITH HEADERS FROM 'file:///dades/SAME_AS.csv' AS row
+WITH row
+WHERE row.Id_A IS NOT NULL AND row.Id_B IS NOT NULL
+MATCH (i1:Individu {id: toInteger(row.Id_A)})
+MATCH (i2:Individu {id: toInteger(row.Id_B)})
+MERGE (i1)-[:SAME_AS]-(i2);
